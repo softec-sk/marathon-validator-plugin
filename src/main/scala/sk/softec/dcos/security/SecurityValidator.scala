@@ -1,88 +1,71 @@
 package sk.softec.dcos.security
 
-import com.wix.accord.{Failure, Result, RuleViolation, Success}
+import com.wix.accord._
+import com.wix.accord.dsl._
 import mesosphere.marathon.plugin.plugin.PluginConfiguration
 import mesosphere.marathon.plugin.validation.RunSpecValidator
-import mesosphere.marathon.plugin.{ApplicationSpec, PodSpec, RunSpec}
+import mesosphere.marathon.plugin.{PodSpec, RunSpec}
+import mesosphere.marathon.state.{AppDefinition, Container, HostVolume, Volume}
 import org.slf4j.LoggerFactory
 import play.api.libs.json.{JsObject, Json, Reads}
 
 class SecurityValidator extends RunSpecValidator with PluginConfiguration {
-
-  import SecurityValidator.logger
 
   private var configuration: SecurityValidatorConfiguration = _
 
   override def initialize(marathonInfo: Map[String, Any], configuration: JsObject): Unit =
     this.configuration = configuration.as[SecurityValidatorConfiguration]
 
-  override def apply(runSpec: RunSpec): Result = runSpec match {
-    case app: ApplicationSpec =>
-      validate(app)
-    case _: PodSpec =>
-      Success
-  }
+  import ViolationBuilder._
 
-  private def validate(app: ApplicationSpec) = {
-    val errors = validateUser(app) ++ validateMounts(app) ++ validateLabels(app)
-
-    if (errors.isEmpty) Success else Failure(errors.toSet)
-  }
-
-  private def validateUser(app: ApplicationSpec) = {
-    val maybeUser = app.user
-    val maybeContainer = fieldValue[Option[AnyRef]](app, "container")
-    val maybeImage = maybeContainer.flatMap[String] { container =>
-      try {
-        Some(fieldValue(container, "image"))
-      } catch {
-        case _: NoSuchFieldException => None
-      }
-    }
-
-    logger.info("Validating app {} running as {} with image {}", app.id, maybeUser, maybeImage)
-
-    // TODO: rozumne zadefinovany default ako zistit ci defaltne bezi pod rootom?
-    if (!configuration.allowRootWithoutImage && (maybeUser.contains("root") || maybeUser.isEmpty) && maybeImage.isEmpty) {
-      Seq(RuleViolation(app.user, "Application without container image cannot run as root."))
-    } else {
-      Nil
+  case class UserValidator(maybeContainer: Option[Container]) extends Validator[Option[String]] {
+    override def apply(maybeUser: Option[String]): Result = maybeUser match {
+      case Some("root") if !configuration.allowRootWithoutImage && maybeContainer.exists(_.isInstanceOf[Container.Mesos]) =>
+        maybeUser -> "Application without container image cannot run as root."
+      case _ =>
+        Success
     }
   }
 
-  private def validateMounts(app: ApplicationSpec) = {
-    logger.info("Validating app {} volume mounts {} and volumes {}", app.id, app.volumeMounts, app.volumes)
-
-    app.volumes.flatMap { volume =>
-      if (volume.getClass.getSimpleName.contains("Host")) {
-        val hostPath = fieldValue[String](volume, "hostPath")
-
-        if (configuration.allowedHostMounts.contains(hostPath)) {
-          None
-        } else {
-          Some(RuleViolation(volume, s"$hostPath cannot be mounted. Allowed host paths are ${configuration.allowedHostMounts.mkString(", ")}."))
+  case object VolumeValidator
+    extends BaseValidator[Volume](
+      volume => {
+        SecurityValidator.logger.info("Validating volume {}", volume)
+        volume match {
+          case HostVolume(_, hostPath) if configuration.allowedHostMounts.contains(hostPath) => true
+          case _                                                                             => false
         }
-      } else {
-        None
-      }
+      },
+      _ -> s"Allowed host paths are ${configuration.allowedHostMounts.mkString(", ")}."
+    )
+
+  case object RequiredLabelsValidator
+    extends BaseValidator[Map[String, String]](
+      labels =>
+        configuration.requiredLabels.forall { requiredLabel =>
+          labels.contains(requiredLabel) && labels(requiredLabel).nonEmpty
+        },
+      _ -> s"Application must have non empty labels ${configuration.requiredLabels.mkString(", ")}"
+    )
+
+  private val appValidator = validator[AppDefinition] { app =>
+    app.user is valid(UserValidator(app.container))
+    app.volumes.each is valid(VolumeValidator)
+    app.labels is valid(RequiredLabelsValidator)
+  }
+
+  private val isValid = new Validator[RunSpec] {
+    override def apply(v1: RunSpec): Result = v1 match {
+      case app: AppDefinition =>
+        appValidator(app)
+      case _: PodSpec =>
+        Success
     }
   }
 
-  private def validateLabels(app: ApplicationSpec) = {
-    logger.info("Validating app {} with labels {}", Seq(app.id, app.labels.keySet): _*)
-
-    configuration.requiredLabels.flatMap { requiredLabel =>
-      app.labels.get(requiredLabel) match {
-        case Some(value) if value.nonEmpty => None
-        case _                             => Some(RuleViolation(app.labels, s"Application must have non empty label $requiredLabel."))
-      }
-    }
-  }
-
-  private def fieldValue[T](obj: AnyRef, fieldName: String) = {
-    val field = obj.getClass.getDeclaredField(fieldName)
-    field.setAccessible(true)
-    field.get(obj).asInstanceOf[T]
+  override def apply(runSpec: RunSpec): Result = {
+    SecurityValidator.logger.info("Validating runSpec {}", runSpec.id)
+    isValid(runSpec)
   }
 }
 
@@ -92,8 +75,8 @@ object SecurityValidator {
 
 case class SecurityValidatorConfiguration(
   allowRootWithoutImage: Boolean,
-  allowedHostMounts: Seq[String],
-  requiredLabels: Seq[String]
+  allowedHostMounts: Set[String],
+  requiredLabels: Set[String]
 )
 
 object SecurityValidatorConfiguration {
