@@ -13,7 +13,13 @@ version := "1.6.535"
 libraryDependencies ++= Seq(
   "mesosphere.marathon" %% "marathon" % version.value % Provided exclude("javax.ws.rs", "javax.ws.rs-api"),
   "mesosphere.marathon" %% "plugin-interface" % version.value % Provided,
-  "org.slf4j" % "slf4j-api" % Version.slf4j % Provided
+  "org.slf4j" % "slf4j-api" % Version.slf4j % Provided,
+  "org.scala-lang" % "scala-compiler" % scalaVersion.value
 )
 
-assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
+// assemblyOptions.includeScala sa neda pouzit, lebo vyluci aj compiler
+assemblyExcludedJars in assembly := {
+  (fullClasspath in assembly).value.filter { dependency =>
+    Seq("scala-library", "scala-reflect", "scala-xml").exists(dependency.data.getName.startsWith)
+  }
+}

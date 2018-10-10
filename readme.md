@@ -7,11 +7,11 @@
       "plugin": "mesosphere.marathon.plugin.validation.RunSpecValidator",
       "implementation": "sk.softec.dcos.security.SecurityValidator",
       "configuration": {
-        "allowRootWithoutImage": false,
-        "allowedHostMounts": ["/mnt/data", "/home"],
-        "requiredLabels": ["MAINTAINER"]
+        "validationsScriptPath": "/opt/softec/marathon-security-validations.scala"
       }
     }
   }
 } 
 ```
+
+Example validations are in [Validations.scala](src/test/scala/sk/softec/dcos/security/example/Validations.scala).
