@@ -7,28 +7,49 @@ object Validations {
   import com.wix.accord.ViolationBuilder._
   import com.wix.accord._
   import com.wix.accord.dsl._
-  import mesosphere.marathon.plugin.{PodSpec, RunSpec}
-  import mesosphere.marathon.state.{AppDefinition, Container, HostVolume, Volume}
+  import mesosphere.marathon.plugin.{PathId, PodSpec, RunSpec}
+  import mesosphere.marathon.state.{AppDefinition, Container, HostVolume, Volume, VolumeWithMount}
 
-  val allowedHostMounts = Seq("/mnt/data", "/home")
+  val allowedHostMountsRW = Seq("/mnt/data/")
+  val allowedHostMountsRO = Seq("/etc/localtime", "/etc/ssl/certs", "/etc/timezone")
   val requiredLabels = Seq("MAINTAINER")
 
-  case class UserValidator(maybeContainer: Option[Container]) extends Validator[Option[String]] {
-    override def apply(maybeUser: Option[String]): Result = maybeUser match {
-      case Some("root") if maybeContainer.exists(_.isInstanceOf[Container.Mesos]) =>
-        maybeUser -> "Application without container image cannot run as root."
-      case _ =>
-        Success
-    }
-  }
-
-  case object VolumeValidator
-      extends BaseValidator[Volume](
+  case class UserValidator(maybeContainer: Option[Container])
+      extends BaseValidator[Option[String]](
         {
-          case HostVolume(_, hostPath) if allowedHostMounts.contains(hostPath) => true
-          case _                                                               => false
+          case Some("root") if maybeContainer.exists(_.isInstanceOf[Container.Mesos]) => false
+          case _                                                                      => true
         },
-        _ -> s"Allowed host paths are ${allowedHostMounts.mkString(", ")}."
+        _ -> "Application without container image cannot run as root."
+      )
+
+  case class PrivilegedContainerValidator(appId: PathId)
+      extends BaseValidator[Container](
+        {
+          case docker: Container.Docker => !docker.privileged || appId.path.head == "layer1"
+          case _                        => true
+        },
+        _ -> "Docker containers cannot run in privileged mode."
+      )
+
+  case class ContainerVolumeValidator(appId: PathId)
+      extends BaseValidator[VolumeWithMount[Volume]](
+        {
+          case VolumeWithMount(HostVolume(_, hostPath), mount) =>
+            // layer1 has complete access, because of the exporters
+            lazy val isLayer1 = appId.path.head == "layer1"
+            // layer 2 is restricted only to its storage
+            lazy val isLayer2 = appId.path.head == "layer2" && hostPath.startsWith("/mnt/layer2/")
+            lazy val isAllowedMountRW = allowedHostMountsRW.exists(hostPath.startsWith)
+            lazy val isAllowedMountRO = mount.readOnly && allowedHostMountsRO.exists(hostPath.startsWith)
+            // all paths without / are relative to sandbox and valid as persistent mounts (so no need to check for persistent volume presence)
+            lazy val isPersistentMount = !hostPath.contains("/")
+
+            isLayer1 || isLayer2 || isAllowedMountRW || isAllowedMountRO || isPersistentMount
+          case _ =>
+            true
+        },
+        _ -> s"Allowed host paths for RW = ${allowedHostMountsRW.mkString(", ")}, RO = ${allowedHostMountsRO.mkString(", ")}."
       )
 
   case object RequiredLabelsValidator
@@ -40,9 +61,15 @@ object Validations {
         _ -> s"Application must have non empty labels ${requiredLabels.mkString(", ")}"
       )
 
-  val appValidator = validator[AppDefinition] { app =>
+  def containerValidator(appId: PathId): Validator[Container] =
+    validator[Container] { container =>
+      container is valid(PrivilegedContainerValidator(appId))
+      container.volumes.each is valid(ContainerVolumeValidator(appId))
+    }
+
+  val appValidator: Validator[AppDefinition] = validator[AppDefinition] { app =>
     app.user is valid(UserValidator(app.container))
-    app.volumes.each is valid(VolumeValidator)
+    app.container.each is valid(containerValidator(app.id))
     app.labels is valid(RequiredLabelsValidator)
   }
 
