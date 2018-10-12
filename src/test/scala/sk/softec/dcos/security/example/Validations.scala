@@ -32,6 +32,13 @@ object Validations {
         _ -> "Docker containers cannot run in privileged mode."
       )
 
+  case object ForcePullImageEnabled extends BaseValidator[Container]({
+    case docker: Container.Docker => docker.forcePullImage
+    case mesosAppC: Container.MesosAppC => mesosAppC.forcePullImage
+    case mesosDocker: Container.MesosDocker => mesosDocker.forcePullImage
+    case _ => true
+  }, _ -> "All containers must have forcePullImage enabled.")
+
   case class ContainerVolumeValidator(appId: PathId)
       extends BaseValidator[VolumeWithMount[Volume]](
         {
@@ -58,12 +65,13 @@ object Validations {
           requiredLabels.forall { requiredLabel =>
             labels.contains(requiredLabel) && labels(requiredLabel).nonEmpty
         },
-        _ -> s"Application must have non empty labels ${requiredLabels.mkString(", ")}"
+        _ -> s"Application must have non empty labels ${requiredLabels.mkString(", ")}."
       )
 
   def containerValidator(appId: PathId): Validator[Container] =
     validator[Container] { container =>
       container is valid(PrivilegedContainerValidator(appId))
+      container is valid(ForcePullImageEnabled)
       container.volumes.each is valid(ContainerVolumeValidator(appId))
     }
 
