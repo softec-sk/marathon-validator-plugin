@@ -32,12 +32,27 @@ object Validations {
         _ -> "Docker containers cannot run in privileged mode."
       )
 
-  case object ForcePullImageEnabled extends BaseValidator[Container]({
-    case docker: Container.Docker => docker.forcePullImage
-    case mesosAppC: Container.MesosAppC => mesosAppC.forcePullImage
-    case mesosDocker: Container.MesosDocker => mesosDocker.forcePullImage
-    case _ => true
-  }, _ -> "All containers must have forcePullImage enabled.")
+  case object ForcePullImageEnabled
+      extends BaseValidator[Container](
+        {
+          case docker: Container.Docker           => docker.forcePullImage
+          case mesosAppC: Container.MesosAppC     => mesosAppC.forcePullImage
+          case mesosDocker: Container.MesosDocker => mesosDocker.forcePullImage
+          case _                                  => true
+        },
+        _ -> "All containers must have forcePullImage enabled."
+      )
+
+  val allowedDockerParameters = Seq("label", "log-driver", "ulimit", "user")
+
+  case object DockerContainerParameters
+      extends BaseValidator[Container](
+        {
+          case docker: Container.Docker => docker.parameters.forall(parameter => allowedDockerParameters.contains(parameter.key))
+          case _                        => true
+        },
+        _ -> s"Only ${allowedDockerParameters.mkString(", ")} docker parameters are allowed."
+      )
 
   case class ContainerVolumeValidator(appId: PathId)
       extends BaseValidator[VolumeWithMount[Volume]](
@@ -72,6 +87,7 @@ object Validations {
     validator[Container] { container =>
       container is valid(PrivilegedContainerValidator(appId))
       container is valid(ForcePullImageEnabled)
+      container is valid(DockerContainerParameters)
       container.volumes.each is valid(ContainerVolumeValidator(appId))
     }
 
