@@ -10,9 +10,10 @@ object Validations {
   import mesosphere.marathon.plugin.{PathId, PodSpec, RunSpec}
   import mesosphere.marathon.state.{AppDefinition, Container, HostVolume, Volume, VolumeWithMount}
 
+  import scala.util.matching.Regex
+
   val allowedHostMountsRW = Seq("/mnt/data/")
   val allowedHostMountsRO = Seq("/etc/localtime", "/etc/ssl/certs", "/etc/timezone")
-  val requiredLabels = Seq("MAINTAINER")
 
   case class UserValidator(maybeContainer: Option[Container])
       extends BaseValidator[Option[String]](
@@ -74,13 +75,14 @@ object Validations {
         _ -> s"Allowed host paths for RW = ${allowedHostMountsRW.mkString(", ")}, RO = ${allowedHostMountsRO.mkString(", ")}."
       )
 
-  case object RequiredLabelsValidator
+  object EmailRegexp {
+    val softec: Regex = "[a-zA-Z.]+@softec\\.(sk|cz)(,[a-zA-Z.]+@softec\\.(sk|cz))*".r
+  }
+
+  case object MaintainerValidator
       extends BaseValidator[Map[String, String]](
-        labels =>
-          requiredLabels.forall { requiredLabel =>
-            labels.contains(requiredLabel) && labels(requiredLabel).nonEmpty
-        },
-        _ -> s"Application must have non empty labels ${requiredLabels.mkString(", ")}."
+        labels => labels.get("MAINTAINER").exists(label => EmailRegexp.softec.pattern.matcher(label).matches()),
+        _ -> s"Application must have label MAINTAINER with comma separated email addresses of task maintainers."
       )
 
   def containerValidator(appId: PathId): Validator[Container] =
@@ -94,7 +96,7 @@ object Validations {
   val appValidator: Validator[AppDefinition] = validator[AppDefinition] { app =>
     app.user is valid(UserValidator(app.container))
     app.container.each is valid(containerValidator(app.id))
-    app.labels is valid(RequiredLabelsValidator)
+    app.labels is valid(MaintainerValidator)
   }
 
   new Validator[RunSpec] {
