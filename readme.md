@@ -1,5 +1,7 @@
 # Marathon security validation plugin
 
+Extensible Marathon plugin for additional tasks security validation. Leveraging Scala `ScriptEngined` for customizable validations via [Accord](http://wix.github.io/accord/). 
+
 ```json
 {
   "plugins": {

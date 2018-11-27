@@ -18,7 +18,7 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.5" % Test
 )
 
-// assemblyOptions.includeScala sa neda pouzit, lebo vyluci aj compiler
+// assemblyOptions.includeScala cannot be used, it will exclude scala-compiler
 assemblyExcludedJars in assembly := {
   (fullClasspath in assembly).value.filter { dependency =>
     Seq("scala-library", "scala-reflect", "scala-xml").exists(dependency.data.getName.startsWith)
