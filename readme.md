@@ -1,19 +1,19 @@
-# Marathon security validation plugin
+# Marathon validator plugin
 
-Extensible Marathon plugin for additional tasks security validation. Leveraging Scala `ScriptEngined` for customizable validations via [Accord](http://wix.github.io/accord/). 
+Extensible Marathon plugin for additional tasks validation. Leveraging Scala `ScriptEngined` for customizable validations via [Accord](http://wix.github.io/accord/). 
 
 ```json
 {
   "plugins": {
-    "security-validation": {
+    "validations": {
       "plugin": "mesosphere.marathon.plugin.validation.RunSpecValidator",
-      "implementation": "sk.softec.dcos.security.SecurityValidator",
+      "implementation": "sk.softec.dcos.validations.ScriptableValidator",
       "configuration": {
-        "validationsScriptPath": "/opt/softec/marathon-security-validations.scala"
+        "validationsScriptPath": "/opt/softec/marathon-custom-validations.scala"
       }
     }
   }
 } 
 ```
 
-Example validations are in [Validations.scala](src/test/scala/sk/softec/dcos/security/example/Validations.scala).
+Example validations are in [Validations.scala](src/test/scala/sk/softec/dcos/validations/example/Validations.scala).

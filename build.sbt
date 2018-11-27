@@ -1,6 +1,6 @@
 organization := "sk.softec.dcos"
 
-name := "marathon-security-validator"
+name := "marathon-validator-plugin"
 
 resolvers += "Mesosphere Public Repo" at "http://downloads.mesosphere.io/maven"
 

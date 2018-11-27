@@ -1,4 +1,4 @@
-package sk.softec.dcos.security
+package sk.softec.dcos.validations
 
 import com.wix.accord.{Result, Validator}
 import javax.script.ScriptEngineManager
@@ -9,7 +9,7 @@ import play.api.libs.json.JsObject
 
 import scala.io.Source
 
-class SecurityValidator extends RunSpecValidator with PluginConfiguration {
+class ScriptableValidator extends RunSpecValidator with PluginConfiguration {
 
   private var validator: Validator[RunSpec] = _
 

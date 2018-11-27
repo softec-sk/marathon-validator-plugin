@@ -1,4 +1,4 @@
-package sk.softec.dcos.security.example
+package sk.softec.dcos.validations.example
 
 import com.wix.accord._
 import com.wix.accord.dsl._

@@ -1,4 +1,4 @@
-package sk.softec.dcos.security.example
+package sk.softec.dcos.validations.example
 
 /**
  * Example validations
