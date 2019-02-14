@@ -12,7 +12,6 @@ object Validations {
 
   import scala.util.matching.Regex
 
-  val allowedHostMountsRW = Seq("/mnt/data/")
   val allowedHostMountsRO = Seq("/etc/localtime", "/etc/ssl/certs", "/etc/timezone")
 
   case class UserValidator(maybeContainer: Option[Container])
@@ -63,7 +62,7 @@ object Validations {
             lazy val isLayer1 = appId.path.head == "layer1"
             // layer 2 is restricted only to its storage
             lazy val isLayer2 = appId.path.head == "layer2" && hostPath.startsWith("/mnt/layer2/")
-            lazy val isAllowedMountRW = allowedHostMountsRW.exists(hostPath.startsWith)
+            lazy val isAllowedMountRW = hostPath.startsWith(s"/mnt/data/${appId.path.head}/")
             lazy val isAllowedMountRO = mount.readOnly && allowedHostMountsRO.exists(hostPath.startsWith)
             // all paths without / are relative to sandbox and valid as persistent mounts (so no need to check for persistent volume presence)
             lazy val isPersistentMount = !hostPath.contains("/")
@@ -72,7 +71,7 @@ object Validations {
           case _ =>
             true
         },
-        _ -> s"Allowed host paths for RW = ${allowedHostMountsRW.mkString(", ")}, RO = ${allowedHostMountsRO.mkString(", ")}."
+        _ -> s"Allowed host paths for RW = /mnt/data/${appId.path.head}/, RO = ${allowedHostMountsRO.mkString(", ")}."
       )
 
   object EmailRegexp {
