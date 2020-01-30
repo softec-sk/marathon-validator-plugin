@@ -6,7 +6,7 @@ resolvers += "Mesosphere Public Repo" at "http://downloads.mesosphere.io/maven"
 
 scalacOptions += "-target:jvm-1.8"
 
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.7"
 
 version := "1.6.535"
 
