@@ -8,7 +8,7 @@ scalacOptions += "-target:jvm-1.8"
 
 scalaVersion := "2.12.7"
 
-version := "1.6.535"
+version := "1.7.202"
 
 libraryDependencies ++= Seq(
   "mesosphere.marathon" %% "marathon" % version.value % Provided exclude("javax.ws.rs", "javax.ws.rs-api"),
