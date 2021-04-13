@@ -19,7 +19,8 @@ class MaintainerValidatorTest extends FunSpec with Matchers with AppValidatorTes
     it("should reject App without MAINTAINER label") {
       // setup
       val app = AppDefinition(
-        id = PathId("/app")
+        id = AbsolutePathId("/app"),
+        role = "role"
       )
       // run
       val result = sut(app)
@@ -30,8 +31,9 @@ class MaintainerValidatorTest extends FunSpec with Matchers with AppValidatorTes
     it("should reject App with empty MAINTAINER label") {
       // setup
       val app = AppDefinition(
-        id = PathId("/app"),
-        labels = Map("MAINTAINER" -> "")
+        id = AbsolutePathId("/app"),
+        labels = Map("MAINTAINER" -> ""),
+        role = "role"
       )
       // run
       val result = sut(app)
@@ -42,8 +44,9 @@ class MaintainerValidatorTest extends FunSpec with Matchers with AppValidatorTes
     it("should reject App with MAINTAINER label outside @softec domain") {
       // setup
       val app = AppDefinition(
-        id = PathId("/app"),
-        labels = Map("MAINTAINER" -> "firstName.lastName@gmail.com")
+        id = AbsolutePathId("/app"),
+        labels = Map("MAINTAINER" -> "firstName.lastName@gmail.com"),
+        role = "role"
       )
       // run
       val result = sut(app)
@@ -54,8 +57,9 @@ class MaintainerValidatorTest extends FunSpec with Matchers with AppValidatorTes
     it("should allow App with MAINTAINER label with multiple valid email addresses from @softec domain") {
       // setup
       val app = AppDefinition(
-        id = PathId("/app"),
-        labels = Map("MAINTAINER" -> "firstName.lastName@softec.sk,anotherFirstName.anotherLastName@softec.cz,login@softec.sk")
+        id = AbsolutePathId("/app"),
+        labels = Map("MAINTAINER" -> "firstName.lastName@softec.sk,anotherFirstName.anotherLastName@softec.cz,login@softec.sk"),
+        role = "role"
       )
       // run
       val result = sut(app)
